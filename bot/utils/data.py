@@ -6,6 +6,7 @@ import pandas as pd
 import pandas_ta as ta
 from .providers.binance import fetch_klines
 from .providers.yahoo import fetch_candles as yahoo_fetch
+from .providers.quotex import fetch_candles as quotex_fetch
 from .otc import is_otc_pair, strip_otc_suffix, to_yfinance_symbol
 
 
@@ -21,13 +22,21 @@ def timeframe_to_interval(timeframe: str) -> str:
 
 def get_candles(pair: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
 	"""Fetch OHLCV data for a pair and timeframe.
-	- Routes OTC pairs (suffix -OTC/_OTC) to Yahoo Finance
-	- Routes others to Binance public REST
+	- OTC: try Quotex (if enabled and creds present) then Yahoo fallback
+	- Non-OTC: Binance public REST
 	"""
+	use_quotex = os.getenv("QUOTEX_ENABLED", "false").lower() == "true"
 	if is_otc_pair(pair):
 		underlying = strip_otc_suffix(pair)
-		symbol = to_yfinance_symbol(map_pair_to_ticker(underlying))
-		df = yahoo_fetch(symbol, timeframe, limit)
+		if use_quotex:
+			df = quotex_fetch(underlying, timeframe, limit)
+			if df is None or df.empty:
+				# fallback
+				symbol = to_yfinance_symbol(map_pair_to_ticker(underlying))
+				df = yahoo_fetch(symbol, timeframe, limit)
+		else:
+			symbol = to_yfinance_symbol(map_pair_to_ticker(underlying))
+			df = yahoo_fetch(symbol, timeframe, limit)
 	else:
 		df = fetch_klines(pair, timeframe, limit)
 	if not isinstance(df, pd.DataFrame) or df.empty:
