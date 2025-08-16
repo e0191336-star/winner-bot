@@ -22,6 +22,7 @@ DEFAULT_PAIRS = [p.strip() for p in os.getenv("DEFAULT_PAIRS", "BTC-USD,ETH-USD"
 DEFAULT_TIMEFRAMES = [t.strip() for t in os.getenv("DEFAULT_TIMEFRAMES", "1m,5m,15m").split(",") if t.strip()]
 MIN_CONFIRMATIONS = int(os.getenv("MIN_CONFIRMATIONS", "2"))
 SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "true").lower() == "true"
+OTC_ALL = os.getenv("OTC_ALL", "false").lower() == "true"
 
 os.makedirs(os.path.dirname(CSV_LOG_FILE), exist_ok=True)
 logger.add(ROTATING_LOG_FILE, rotation="10 MB")
@@ -90,10 +91,22 @@ async def start_engine():
 	if not SCHEDULER_ENABLED:
 		logger.warning("Scheduler disabled by env")
 		return
-	engine = SignalEngine(DEFAULT_PAIRS, DEFAULT_TIMEFRAMES, min_confirmations=MIN_CONFIRMATIONS)
+	pairs = list(DEFAULT_PAIRS)
+	if OTC_ALL:
+		try:
+			import json
+			from pathlib import Path
+			otc_list = json.loads((Path(__file__).parent / "pairs" / "otc_pairs.json").read_text())
+			for p in otc_list:
+				if p not in pairs:
+					pairs.append(p)
+			logger.info(f"Loaded OTC pairs: {len(otc_list)}")
+		except Exception as e:
+			logger.warning(f"Failed loading OTC list: {e}")
+	engine = SignalEngine(pairs, DEFAULT_TIMEFRAMES, min_confirmations=MIN_CONFIRMATIONS)
 	_engine_thread = EngineThread(engine, _on_engine_signal, interval_seconds=15)
 	_engine_thread.start()
-	logger.info(f"Signal engine started for pairs={DEFAULT_PAIRS} timeframes={DEFAULT_TIMEFRAMES} conf>={MIN_CONFIRMATIONS}")
+	logger.info(f"Signal engine started for pairs={pairs[:5]}... total={len(pairs)} timeframes={DEFAULT_TIMEFRAMES} conf>={MIN_CONFIRMATIONS}")
 
 
 @app.on_event("shutdown")
