@@ -5,6 +5,8 @@ from typing import Optional
 import pandas as pd
 import pandas_ta as ta
 from .providers.binance import fetch_klines
+from .providers.yahoo import fetch_candles as yahoo_fetch
+from .otc import is_otc_pair, strip_otc_suffix, to_yfinance_symbol
 
 
 def map_pair_to_ticker(pair: str) -> str:
@@ -18,10 +20,16 @@ def timeframe_to_interval(timeframe: str) -> str:
 
 
 def get_candles(pair: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
-	"""Fetch OHLCV data for a pair and timeframe using Binance public REST.
-	Returns a DataFrame with columns: open, high, low, close, volume and adds indicators used by strategies.
+	"""Fetch OHLCV data for a pair and timeframe.
+	- Routes OTC pairs (suffix -OTC/_OTC) to Yahoo Finance
+	- Routes others to Binance public REST
 	"""
-	df = fetch_klines(pair, timeframe, limit)
+	if is_otc_pair(pair):
+		underlying = strip_otc_suffix(pair)
+		symbol = to_yfinance_symbol(map_pair_to_ticker(underlying))
+		df = yahoo_fetch(symbol, timeframe, limit)
+	else:
+		df = fetch_klines(pair, timeframe, limit)
 	if not isinstance(df, pd.DataFrame) or df.empty:
 		return pd.DataFrame()
 	# Indicators
