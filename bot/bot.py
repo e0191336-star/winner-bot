@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from .utils.scheduler import SignalEngine, EngineThread, EvaluatedSignal
+from .auth import router as auth_router
 
 load_dotenv()
 
@@ -26,6 +27,7 @@ os.makedirs(os.path.dirname(CSV_LOG_FILE), exist_ok=True)
 logger.add(ROTATING_LOG_FILE, rotation="10 MB")
 
 app = FastAPI(title="Winner Bot API", version="0.1.0")
+app.include_router(auth_router)
 
 
 class Signal(BaseModel):
