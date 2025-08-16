@@ -4,6 +4,7 @@ from typing import Optional
 
 import pandas as pd
 import pandas_ta as ta
+from .providers.binance import fetch_klines
 
 
 def map_pair_to_ticker(pair: str) -> str:
@@ -17,20 +18,12 @@ def timeframe_to_interval(timeframe: str) -> str:
 
 
 def get_candles(pair: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
-	"""Fetch OHLCV data for a pair and timeframe. Uses yfinance by default.
+	"""Fetch OHLCV data for a pair and timeframe using Binance public REST.
 	Returns a DataFrame with columns: open, high, low, close, volume and adds indicators used by strategies.
 	"""
-	import yfinance as yf
-
-	ticker = map_pair_to_ticker(pair)
-	interval = timeframe_to_interval(timeframe)
-	period = "7d" if interval == "1m" else "60d"
-	df = yf.download(tickers=ticker, interval=interval, period=period, progress=False)
+	df = fetch_klines(pair, timeframe, limit)
 	if not isinstance(df, pd.DataFrame) or df.empty:
 		return pd.DataFrame()
-	# Normalize columns
-	df = df.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
-	df = df[["open", "high", "low", "close", "volume"]].copy()
 	# Indicators
 	df["rsi"] = ta.rsi(df["close"], length=14)
 	macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
@@ -40,8 +33,8 @@ def get_candles(pair: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
 		df["macd_hist"] = macd[macd.columns[2]]
 	ema_short = ta.ema(df["close"], length=9)
 	ema_long = ta.ema(df["close"], length=21)
-	df["ema_short"] = emashort = ema_short
-	df["ema_long"] = emalong = ema_long
+	df["ema_short"] = ema_short
+	df["ema_long"] = ema_long
 	bb = ta.bbands(df["close"], length=20, std=2)
 	if bb is not None and not bb.empty:
 		df["bb_low"] = bb[bb.columns[0]]
