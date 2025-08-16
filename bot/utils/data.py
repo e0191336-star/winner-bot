@@ -20,13 +20,30 @@ def timeframe_to_interval(timeframe: str) -> str:
 	return lookup.get(timeframe, "1m")
 
 
+def _calibrate_otc(df: pd.DataFrame) -> pd.DataFrame:
+	if df is None or df.empty:
+		return df
+	if os.getenv("QUOTEX_CALIBRATE", "true").lower() != "true":
+		return df
+	dec = int(os.getenv("QUOTEX_DECIMALS", "5"))
+	pips = float(os.getenv("QUOTEX_OFFSET_PIPS", "0"))
+	shift = pips * (10 ** (-dec))
+	for col in ("open", "high", "low", "close"):
+		if col in df.columns:
+			df[col] = df[col].astype(float).round(dec)
+	if shift != 0:
+		df["close"] = (df["close"].astype(float) + shift).round(dec)
+	return df
+
+
 def get_candles(pair: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
 	"""Fetch OHLCV data for a pair and timeframe.
 	- OTC: try Quotex (if enabled and creds present) then Yahoo fallback
 	- Non-OTC: Binance public REST
 	"""
 	use_quotex = os.getenv("QUOTEX_ENABLED", "false").lower() == "true"
-	if is_otc_pair(pair):
+	is_otc = is_otc_pair(pair)
+	if is_otc:
 		underlying = strip_otc_suffix(pair)
 		if use_quotex:
 			df = quotex_fetch(underlying, timeframe, limit)
@@ -41,6 +58,9 @@ def get_candles(pair: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
 		df = fetch_klines(pair, timeframe, limit)
 	if not isinstance(df, pd.DataFrame) or df.empty:
 		return pd.DataFrame()
+	# Calibration for OTC
+	if is_otc:
+		df = _calibrate_otc(df)
 	# Indicators
 	df["rsi"] = ta.rsi(df["close"], length=14)
 	macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
