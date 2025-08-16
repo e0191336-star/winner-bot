@@ -28,6 +28,8 @@ logger.add(ROTATING_LOG_FILE, rotation="10 MB")
 
 app = FastAPI(title="Winner Bot API", version="0.1.0")
 app.include_router(auth_router)
+from .pairs.routes import router as pairs_router
+app.include_router(pairs_router)
 
 
 class Signal(BaseModel):
