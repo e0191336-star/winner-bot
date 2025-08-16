@@ -1,0 +1,5 @@
+{
+	"pairs": ["BTC-USD", "ETH-USD"],
+	"timeframes": ["1m", "5m", "15m"],
+	"min_confirmations": 2
+}

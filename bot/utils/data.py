@@ -1,0 +1,52 @@
+import os
+from datetime import datetime, timedelta
+from typing import Optional
+
+import pandas as pd
+import pandas_ta as ta
+
+
+def map_pair_to_ticker(pair: str) -> str:
+	# Simple mapping; extend as needed for specific broker symbols
+	return pair.replace("/", "-")
+
+
+def timeframe_to_interval(timeframe: str) -> str:
+	lookup = {"1m": "1m", "5m": "5m", "15m": "15m"}
+	return lookup.get(timeframe, "1m")
+
+
+def get_candles(pair: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
+	"""Fetch OHLCV data for a pair and timeframe. Uses yfinance by default.
+	Returns a DataFrame with columns: open, high, low, close, volume and adds indicators used by strategies.
+	"""
+	import yfinance as yf
+
+	ticker = map_pair_to_ticker(pair)
+	interval = timeframe_to_interval(timeframe)
+	period = "7d" if interval == "1m" else "60d"
+	df = yf.download(tickers=ticker, interval=interval, period=period, progress=False)
+	if not isinstance(df, pd.DataFrame) or df.empty:
+		return pd.DataFrame()
+	# Normalize columns
+	df = df.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
+	df = df[["open", "high", "low", "close", "volume"]].copy()
+	# Indicators
+	df["rsi"] = ta.rsi(df["close"], length=14)
+	macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
+	if macd is not None and not macd.empty:
+		df["macd"] = macd[macd.columns[0]]
+		df["macd_signal"] = macd[macd.columns[1]]
+		df["macd_hist"] = macd[macd.columns[2]]
+	ema_short = ta.ema(df["close"], length=9)
+	ema_long = ta.ema(df["close"], length=21)
+	df["ema_short"] = emashort = ema_short
+	df["ema_long"] = emalong = ema_long
+	bb = ta.bbands(df["close"], length=20, std=2)
+	if bb is not None and not bb.empty:
+		df["bb_low"] = bb[bb.columns[0]]
+		df["bb_mid"] = bb[bb.columns[1]]
+		df["bb_high"] = bb[bb.columns[2]]
+	# Volume moving average for spike detection
+	df["vol_ma"] = df["volume"].rolling(20).mean()
+	return df.tail(limit).copy()
