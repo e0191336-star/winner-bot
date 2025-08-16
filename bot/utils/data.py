@@ -7,6 +7,7 @@ import pandas_ta as ta
 from .providers.binance import fetch_klines
 from .providers.yahoo import fetch_candles as yahoo_fetch
 from .providers.quotex import fetch_candles as quotex_fetch
+from .providers.quotex_headless import fetch_candles as quotex_headless_fetch
 from .otc import is_otc_pair, strip_otc_suffix, to_yfinance_symbol
 
 
@@ -38,7 +39,7 @@ def _calibrate_otc(df: pd.DataFrame) -> pd.DataFrame:
 
 def get_candles(pair: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
 	"""Fetch OHLCV data for a pair and timeframe.
-	- OTC: try Quotex (if enabled and creds present) then Yahoo fallback
+	- OTC: try Quotex (if enabled), then headless Quotex, then Yahoo
 	- Non-OTC: Binance public REST
 	"""
 	use_quotex = os.getenv("QUOTEX_ENABLED", "false").lower() == "true"
@@ -48,7 +49,8 @@ def get_candles(pair: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
 		if use_quotex:
 			df = quotex_fetch(underlying, timeframe, limit)
 			if df is None or df.empty:
-				# fallback
+				df = quotex_headless_fetch(underlying, timeframe, limit)
+			if df is None or df.empty:
 				symbol = to_yfinance_symbol(map_pair_to_ticker(underlying))
 				df = yahoo_fetch(symbol, timeframe, limit)
 		else:
