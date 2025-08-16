@@ -1,0 +1,14 @@
+# Secrets
+.env
+.env.*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Logs & data
+bot/logdata/
+
+# Build artifacts
+dist/
