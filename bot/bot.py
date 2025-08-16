@@ -118,9 +118,9 @@ async def get_signal_history(limit: int = 200):
 
 @app.get("/user/status", response_model=UserStatus)
 async def get_user_status(email: str):
-	now = datetime.utcnow()
-	trial_expires = now + timedelta(days=7)
-	return UserStatus(email=email, trial_expires_at=trial_expires, subscription=None, is_blocked=False)
+	from .subscriptions import get_status
+	status = get_status(email)
+	return UserStatus(email=email, trial_expires_at=status["trial_expires_at"], subscription=status.get("subscription"), is_blocked=status["is_blocked"]) 
 
 
 @app.get("/admin/metrics", response_model=AdminMetrics, dependencies=[Depends(require_api_key)])
