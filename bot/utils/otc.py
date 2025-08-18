@@ -1,6 +1,6 @@
 from typing import Tuple
 
-_CCY = {"USD","EUR","GBP","JPY","AUD","NZD","CAD","CHF","CNY","HKD","INR","RUB","TRY"}
+_CCY = {"USD","EUR","GBP","JPY","AUD","NZD","CAD","CHF","CNY","HKD","INR","RUB","TRY","XAU","XAG"}
 
 
 def is_otc_pair(pair: str) -> bool:
@@ -17,16 +17,18 @@ def strip_otc_suffix(pair: str) -> str:
 
 
 def to_yfinance_symbol(underlying: str) -> str:
-	# Crypto e.g. BTC-USD -> BTC-USD
+	# Already dashed: map FX to =X, otherwise keep BASE-QUOTE
 	if "-" in underlying:
 		base, quote = underlying.split("-", 1)
-		if base.upper() not in _CCY and quote.upper() not in _CCY:
-			return f"{base.upper()}-{quote.upper()}"
-		# FX e.g. EUR-USD -> EURUSD=X
 		if base.upper() in _CCY and quote.upper() in _CCY:
 			return f"{base.upper()}{quote.upper()}=X"
-		return underlying
-	# 6-letter FX: EURUSD -> EURUSD=X
-	if len(underlying) == 6 and underlying[:3].upper() in _CCY and underlying[3:].upper() in _CCY:
-		return f"{underlying.upper()}=X"
+		return f"{base.upper()}-{quote.upper()}"
+	# No dash cases
+	up = underlying.upper()
+	# Pure FX 6-letter like EURUSD -> EURUSD=X
+	if len(up) == 6 and up[:3] in _CCY and up[3:] in _CCY:
+		return f"{up}=X"
+	# Generic BASEQUOTE where QUOTE is fiat (e.g., BTCUSD) -> BASE-USD
+	if len(up) > 3 and up[-3:] in _CCY and up[:-3] not in _CCY:
+		return f"{up[:-3]}-{up[-3:]}"
 	return underlying
