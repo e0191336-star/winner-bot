@@ -17,18 +17,18 @@ def strip_otc_suffix(pair: str) -> str:
 
 
 def to_yfinance_symbol(underlying: str) -> str:
-	# Already dashed: map FX to =X, otherwise keep BASE-QUOTE
+	# If already dashed: map FX to =X; otherwise keep BASE-QUOTE form
 	if "-" in underlying:
 		base, quote = underlying.split("-", 1)
 		if base.upper() in _CCY and quote.upper() in _CCY:
 			return f"{base.upper()}{quote.upper()}=X"
 		return f"{base.upper()}-{quote.upper()}"
-	# No dash cases
+	# Handle undashed inputs
 	up = underlying.upper()
-	# Pure FX 6-letter like EURUSD -> EURUSD=X
+	# 6-letter FX like EURUSD -> EURUSD=X
 	if len(up) == 6 and up[:3] in _CCY and up[3:] in _CCY:
 		return f"{up}=X"
-	# Generic BASEQUOTE where QUOTE is fiat (e.g., BTCUSD) -> BASE-USD
+	# Generic BASEQUOTE where QUOTE is fiat/metal (e.g., BTCUSD) -> BASE-USD
 	if len(up) > 3 and up[-3:] in _CCY and up[:-3] not in _CCY:
 		return f"{up[:-3]}-{up[-3:]}"
 	return underlying
